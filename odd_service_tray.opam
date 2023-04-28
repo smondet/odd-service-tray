@@ -5,7 +5,7 @@ description: "A longer description"
 maintainer: ["Seb Mondet"]
 authors: ["Seb Mondet"]
 license: "MIT"
-tags: ["topics" "to describe" "your" "project"]
+tags: ["desktop" "gtk"]
 homepage: "https://github.com/smondet/odd-service-tray"
 doc: "https://url/to/documentation"
 bug-reports: "https://github.com/smondet/odd-service-tray/issues"
@@ -20,6 +20,8 @@ depends: [
   "ppx_base"
   "ppx_inline_test"
   "ppx_expect"
+  "merlin" {with-test}
+  "ocamlformat" {= "0.24.1" & with-test}
   "odoc" {with-doc}
 ]
 build: [
