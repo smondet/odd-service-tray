@@ -1,0 +1,5 @@
+(alias
+ (name default)
+ (deps
+  (alias_rec check)
+  ./odd_service_tray.opam))

@@ -2,4 +2,10 @@
  (name odd_service_tray)
  (libraries lablgtk3 base)
  (preprocess
-  (pps base)))
+  (pps
+   ppx_base
+   ppx_deriving.make
+   ppx_fields_conv
+   ppx_variants_conv
+   ppx_inline_test
+   ppx_expect)))

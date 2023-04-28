@@ -5,13 +5,13 @@
 (generate_opam_files true)
 
 (source
- (github username/reponame))
+ (github smondet/odd-service-tray))
 
-(authors "Author Name")
+(authors "Seb Mondet")
 
-(maintainers "Maintainer Name")
+(maintainers "Seb Mondet")
 
-(license LICENSE)
+(license MIT)
 
 (documentation https://url/to/documentation)
 
@@ -19,8 +19,14 @@
  (name odd_service_tray)
  (synopsis "A short synopsis")
  (description "A longer description")
- (depends ocaml dune)
+ (depends ocaml dune base lablgtk3
+  ppx_deriving
+  ppx_fields_conv
+  ppx_variants_conv
+ppx_base
+ppx_inline_test
+ppx_expect
+)
  (tags
   (topics "to describe" your project)))
 
-; See the complete stanza docs at https://dune.readthedocs.io/en/stable/dune-files.html#dune-project
