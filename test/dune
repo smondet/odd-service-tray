@@ -1,0 +1,5 @@
+(test
+ (name odd_service_tray)
+ (libraries lablgtk3 base)
+ (preprocess
+  (pps base)))

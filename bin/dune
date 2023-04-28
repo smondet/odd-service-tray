@@ -1,0 +1,6 @@
+(executable
+ (public_name odd_service_tray)
+ (name main)
+ (libraries odd_service_tray lablgtk3 base)
+ (preprocess
+  (pps base)))

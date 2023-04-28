@@ -1,0 +1,6 @@
+(library
+ (inline_tests)
+ (name odd_service_tray)
+ (libraries lablgtk3 base)
+ (preprocess
+  (pps ppx_inline_test base)))
