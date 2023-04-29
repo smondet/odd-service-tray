@@ -5,17 +5,17 @@
 Dependencies:
 
 ```sh
-opam switch create ost500 5.0.0
-opam switch link ost500 .
-eval $(opam env)
-opam install ./odd_service_tray.opam --deps-only --with-test
+opam switch create ost414 \
+     --formula='"ocaml-base-compiler" {>= "4.14" & < "4.15"}'
+opam switch link ost414 .
+opam install . --deps-only --with-test --with-doc
 ```
 
 Build:
 
-     dune build
+     opam exec -- dune build
      
 Format & test:
 
-     dune runtest
-     dune fmt
+     opam exec -- dune runtest
+     opam exec -- dune fmt

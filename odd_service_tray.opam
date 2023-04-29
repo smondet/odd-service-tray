@@ -11,7 +11,7 @@ doc: "https://url/to/documentation"
 bug-reports: "https://github.com/smondet/odd-service-tray/issues"
 depends: [
   "ocaml"
-  "dune" {>= "3.7"}
+  "dune" {>= "3.0"}
   "base"
   "lablgtk3"
   "ppx_deriving"
