@@ -110,6 +110,19 @@ let () =
     (* GMisc.status_icon_from_icon_name "utilities-terminal" *)
     GMisc.status_icon_from_pixbuf (App_icon.as_pixbuf ())
   in
+  let menu ~button ~time =
+    let entries =
+      [
+        `I
+          ( "Hello",
+            fun () ->
+              dbgf "Hello";
+              show_window state );
+        `M ("sub-menu", []);
+      ]
+    in
+    GToolbox.popup_menu ~button ~time ~entries
+  in
   tray_icon#set_tooltip_text "tooletippe texte";
   ignore
     (tray_icon#connect#activate ~callback:(fun () ->
@@ -118,7 +131,12 @@ let () =
                  Fmt.epr "a: %d b: %d\n%!" a b;
                  *)
          dbgf "activated %s\n%!" tray_icon#tooltip_text;
+         (* menu ~button:1 ~time:182639598l *)
          (* popup () *)
          show_window state
          (* GToolbox.message_box ~title:"testgtk" "Tray icon activated!" *)));
+  ignore
+    (tray_icon#connect#popup_menu ~callback:(fun a b ->
+         dbgf "popup: a: %d b: %d\n%!" a b;
+         menu ~button:a ~time:(Int32.of_int_exn b)));
   GMain.main ()
