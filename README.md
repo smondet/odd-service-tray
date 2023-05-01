@@ -19,3 +19,7 @@ Format & test:
 
      opam exec -- dune runtest
      opam exec -- dune fmt
+
+Run
+
+    opam exec -- dune exec bin/main.exe
