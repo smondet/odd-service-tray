@@ -22,4 +22,4 @@ Format & test:
 
 Run
 
-    opam exec -- dune exec bin/main.exe
+    opam exec -- dune exec bin/main.exe start

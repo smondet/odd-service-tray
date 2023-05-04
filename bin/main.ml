@@ -2,6 +2,40 @@ let dbgf fmt = Format.kasprintf (Printf.eprintf "%s\n%!") fmt
 
 open! Base
 
+module Action = struct
+  type t = Command of string [@@deriving sexp, variants, equal, compare]
+end
+
+module Service = struct
+  type t = {
+    display_name : string; [@main]
+    start : Action.t;
+    stop : Action.t;
+    get_status : Action.t;
+  }
+  [@@deriving sexp, fields, equal, compare, make]
+
+  module Example = struct
+    let ml_donkey_docker =
+      make "MLDonkey"
+        ~start:
+          (Action.command
+             "docker run --rm -d --name mldonkey-service -v \
+              $HOME/.local/mldonkey/config:/var/lib/mldonkey:rw -v \
+              $HOME/.local/mldonkey/tmp:/mnt/mldonkey_tmp:rw -e PUID=1000 -e \
+              PGID=1000 -v $HOME/Downloads/:/mnt/mldonkey_completed:rw -p \
+              4000:4000 -p 4001:4001 -p 4080:4080 -p 20562:20562 -p \
+              20566:20566/udp -p 16965:16965 -p 16965:16965/udp -p 6209:6209 \
+              -p 6209:6209/udp -p 6881:6881 -p 6882:6882 -p 3617:3617/udp -p \
+              4444:4444 -p 4444:4444/udp logicwar/mldonkey")
+        ~stop:(Action.command "docker kill mldonkey-service")
+        ~get_status:
+          (Action.command
+             "docker exec  mldonkey-service sh -c 'ps aux | grep mldonkey | \
+              grep -v grep'")
+  end
+end
+
 module App_icon = struct
   let xpm_hack =
     [|
@@ -101,7 +135,7 @@ let show_window state =
   State.set_main_windows state (window :: State.main_windows state);
   ()
 
-let () =
+let start_application () =
   let _ = GMain.init () in
   let state = State.create () in
   let tray_icon =
@@ -143,3 +177,13 @@ let () =
          dbgf "popup: a: %d b: %d\n%!" a b;
          menu ~button:a ~time:(Int32.of_int_exn b)));
   GMain.main ()
+
+let () =
+  match Caml.Sys.argv.(1) with
+  | "start" -> start_application ()
+  | "examples" ->
+      dbgf "ml_donkey_docker:@ %a" Sexp.pp_hum
+        (Service.sexp_of_t Service.Example.ml_donkey_docker)
+  | other -> Caml.Format.kasprintf failwith "Wrong command: %S" other
+  | exception _ ->
+      Caml.Format.kasprintf failwith "Missing command: start or examples"
