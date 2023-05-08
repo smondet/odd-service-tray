@@ -11,17 +11,15 @@
    ppx_inline_test
    ppx_expect)))
 
-
 (rule
  (target data.ml)
  (deps
   (:gen xpm2ocaml.exe)
-  (:xpm ost.xpm)
-  )
+  (:xpm ost.xpm))
  (action
   (with-stdout-to
-   data.ml (run %{gen} %{xpm}))))
-
+   data.ml
+   (run %{gen} %{xpm}))))
 
 (executable
  (public_name odd_service_tray)
