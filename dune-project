@@ -26,6 +26,7 @@
   ppx_base
   ppx_inline_test
   ppx_expect
+  sexplib
   ;; We use `with-test` because `--with-dev` is not yet in the released `opam`:
   (merlin :with-test)
   (ocamlformat (and (= "0.24.1") :with-test)))

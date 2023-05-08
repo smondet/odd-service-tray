@@ -20,6 +20,7 @@ depends: [
   "ppx_base"
   "ppx_inline_test"
   "ppx_expect"
+  "sexplib"
   "merlin" {with-test}
   "ocamlformat" {= "0.24.1" & with-test}
   "odoc" {with-doc}

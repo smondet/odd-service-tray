@@ -36,6 +36,18 @@ module Service = struct
   end
 end
 
+module Configuration = struct
+  type t = {
+    default_browser_command : string option;
+    services : Service.t list; [@main]
+  }
+  [@@deriving sexp, fields, equal, compare, make]
+
+  module Example = struct
+    let e0 = make [ Service.Example.ml_donkey_docker ]
+  end
+end
+
 module App_icon = struct
   let xpm_hack =
     [|
@@ -112,10 +124,47 @@ module App_icon = struct
 end
 
 module State = struct
-  type t = { mutable main_windows : GWindow.window list } [@@deriving fields]
+  type t = {
+    mutable configuration : Configuration.t option;
+    mutable configuration_path : string option;
+    mutable main_windows : GWindow.window list;
+  }
+  [@@deriving fields, make]
 
-  let create () = { main_windows = [] }
+  let create () = make ()
+
+  let load_configuration_path state path =
+    let b = Buffer.create 42 in
+    let i = Caml.open_in_bin path in
+    (try Caml.Buffer.add_channel b i Int.max_value with End_of_file -> ());
+    Caml.close_in i;
+    let configuration =
+      Sexplib.Sexp.of_string (Buffer.contents b) |> Configuration.t_of_sexp
+    in
+    state.configuration <- Some configuration;
+    state.configuration_path <- Some path;
+    ()
+
+  let load_example state configuration =
+    state.configuration <- Some configuration;
+    ()
 end
+
+let protect_exn f =
+  try f ()
+  with e ->
+    let msg = Caml.Format.(asprintf "@[Exception:@ %a@]\n%!" Exn.pp e) in
+    Caml.Printf.eprintf "%s\n%!" msg;
+    GToolbox.message_box ~title:"Error: unhandled exception" msg;
+    raise e
+
+let not_implemented s () =
+  let msg =
+    Caml.Format.(asprintf "@[Not implemented:@ %a@]\n%!" pp_print_text s)
+  in
+  Caml.Printf.eprintf "%s\n%!" msg;
+  GToolbox.message_box ~title:"Error: Not Implemented" msg;
+  ()
 
 let show_window state =
   let window =
@@ -135,22 +184,43 @@ let show_window state =
   State.set_main_windows state (window :: State.main_windows state);
   ()
 
-let start_application () =
+let start_application load_state =
   let _ = GMain.init () in
   let state = State.create () in
+  load_state state;
   let tray_icon =
     (* GMisc.status_icon_from_icon_name "utilities-terminal" *)
     GMisc.status_icon_from_pixbuf (App_icon.as_pixbuf ())
   in
   let menu ~button ~time =
     let entries =
+      let services_section =
+        match State.configuration state with
+        | None -> `I ("No Configuration", Fn.ignore)
+        | Some conf -> begin
+            match Configuration.services conf with
+            | [] -> `I ("No services", Fn.ignore)
+            | more ->
+                `M
+                  ( "Services",
+                    List.map more ~f:(fun service ->
+                        `M
+                          ( Service.display_name service,
+                            [
+                              `I ("Start", not_implemented "start");
+                              `I ("Get Status", not_implemented "status");
+                              `I ("Stop", not_implemented "stop");
+                              `I ("Show UI", not_implemented "show ui");
+                            ] )) )
+          end
+      in
       [
         `I
           ( "Show Main Window",
             fun () ->
               dbgf "Hello";
               show_window state );
-        `M ("sub-menu", []);
+        services_section;
         `I
           ( "Close All Windows",
             fun () ->
@@ -179,11 +249,18 @@ let start_application () =
   GMain.main ()
 
 let () =
-  match Caml.Sys.argv.(1) with
-  | "start" -> start_application ()
-  | "examples" ->
-      dbgf "ml_donkey_docker:@ %a" Sexp.pp_hum
-        (Service.sexp_of_t Service.Example.ml_donkey_docker)
-  | other -> Caml.Format.kasprintf failwith "Wrong command: %S" other
-  | exception _ ->
-      Caml.Format.kasprintf failwith "Missing command: start or examples"
+  protect_exn @@ fun () ->
+  match Array.to_list Caml.Sys.argv with
+  | [ _; "start" ] ->
+      start_application (fun state ->
+          State.load_example state Configuration.Example.e0)
+  | [ _; "start"; path ] ->
+      start_application (fun state -> State.load_configuration_path state path)
+  | [ _; "examples" ] ->
+      dbgf "Example-config-0:@ %a" Sexp.pp_hum
+        (Configuration.sexp_of_t Configuration.Example.e0)
+  | other ->
+      Caml.Format.(
+        kasprintf failwith "Wrong command: %a"
+          (pp_print_list pp_print_string)
+          other)

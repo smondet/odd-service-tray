@@ -1,7 +1,7 @@
 (executable
  (public_name odd_service_tray)
  (name main)
- (libraries odd_service_tray lablgtk3 base)
+ (libraries odd_service_tray lablgtk3 base sexplib)
  (preprocess
   (pps
    ppx_base
