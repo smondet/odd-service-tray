@@ -1,6 +1,32 @@
 (executable
+ (name xpm2ocaml)
+ (modules xpm2ocaml)
+ (libraries base)
+ (preprocess
+  (pps
+   ppx_base
+   ppx_deriving.make
+   ppx_fields_conv
+   ppx_variants_conv
+   ppx_inline_test
+   ppx_expect)))
+
+
+(rule
+ (target data.ml)
+ (deps
+  (:gen xpm2ocaml.exe)
+  (:xpm ost.xpm)
+  )
+ (action
+  (with-stdout-to
+   data.ml (run %{gen} %{xpm}))))
+
+
+(executable
  (public_name odd_service_tray)
  (name main)
+ (modules main data)
  (libraries odd_service_tray lablgtk3 base sexplib)
  (preprocess
   (pps

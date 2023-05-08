@@ -49,77 +49,8 @@ module Configuration = struct
 end
 
 module App_icon = struct
-  let xpm_hack =
-    [|
-      "60 60 4 1";
-      ". c None";
-      "r c #d60000";
-      "g c #00c400";
-      "w c #FFFFFF";
-      ".....wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww";
-      "...wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww";
-      "..wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww";
-      "wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww..........";
-      "wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww........ggggg";
-      "wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww...................gggggg";
-      "wwwwwwwwwwwwwwwwwwww.................................ggggggg";
-      "wwwwwwwwwwwwww.......................................ggggggg";
-      "wwwwwwwwwww..........................................ggggggg";
-      "wwwwwwwwwww..........................................ggggggg";
-      "wwwwww...............................................ggggggg";
-      "wwwwww...............................................ggggggg";
-      "wwwwww...............................................ggggggg";
-      "wwwwww...............................................ggggggg";
-      "wwwwww...............................................ggggggg";
-      "wwwwww...............................................ggggggg";
-      "wwwwww...............................................ggggggg";
-      "wwwwww...............................................ggggggg";
-      "wwwwww...............................................ggggggg";
-      "wwwwwwww.............................................ggggggg";
-      "wwwwwwwww............................................ggggggg";
-      "wwwwwwwww............................................ggggggg";
-      "wwwwwwwwww...........................................ggggggg";
-      "wwwwwwwwwww..........................................ggggggg";
-      "wwwwwwwwwww...........................................gggggg";
-      "wwwwwwwwwww............................................ggggg";
-      ".wwwwwwwwww.................................................";
-      "..wwwwwwwww........rrrrrrrrrrrrrrrrrrrrrr...................";
-      "..............rrrrrrrrrrrrrrrrrrrrrrrrrrrrr.................";
-      "............rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr...............";
-      "............rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr...............";
-      "............rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr......wwwwwww..";
-      "............rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr.......wwwwwww.";
-      "..............rrrrrrrrrrrrrrrrrrrrrrrrrrrrr.........wwwwwwww";
-      "..............rrrrrrrrrrrrrrrrrrrrrr................wwwwwwww";
-      "....................................................wwwwwwww";
-      "gggggg..............................................wwwwwwww";
-      "ggggggg.............................................wwwwwwww";
-      "gggggggg............................................wwwwwwww";
-      "gggggggg............................................wwwwwwww";
-      "gggggggg............................................wwwwwwww";
-      "gggggggg............................................wwwwwwww";
-      "gggggggg............................................wwwwwwww";
-      "gggggggg............................................wwwwwwww";
-      "gggggggg............................................wwwwwwww";
-      "gggggggg............................................wwwwwwww";
-      "gggggggg............................................wwwwwwww";
-      "gggggggg............................................wwwwwwww";
-      "gggggggg............................................wwwwwwww";
-      "gggggggg............................................wwwwwwww";
-      "gggggggg............................................wwwwwwww";
-      "gggggggg...........................................wwwwwwwww";
-      "gggggggg.........................................wwwwwwwwwww";
-      "gggggggg........................................wwwwwwwwwwww";
-      "ggggggg..............wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww";
-      "gggggg............wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww";
-      ".............wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww";
-      ".wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww";
-      "wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww.";
-      "wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww...";
-      "wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww.....";
-    |]
-
-  let pixbuf = lazy (GdkPixbuf.from_xpm_data xpm_hack)
+  let data = Data.ost_xpm
+  let pixbuf = lazy (GdkPixbuf.from_xpm_data data)
   let as_pixbuf () = Lazy.force pixbuf
 end
 
