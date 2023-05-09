@@ -69,14 +69,27 @@ end
 
 module State = struct
   module Service_data = struct
+    type status = (unit, string) Result.t
+
     type t = {
       service : Service.t; [@main]
-      mutable last_status : (unit, string) Result.t;
+      mutable last_status : status;
       mutable status_thread : Thread.t option;
+      mutable on_change :
+        ([ `Status of status | `Starting | `Stopping ] -> unit) list;
     }
     [@@deriving fields, make]
 
-    let pp fmt { service; last_status; status_thread } =
+    let signal_change self change =
+      List.iter self.on_change ~f:(fun f -> f change)
+
+    let set_last_status self s =
+      List.iter self.on_change ~f:(fun f -> f (`Status s));
+      set_last_status self s
+
+    let add_on_change self f = self.on_change <- f :: self.on_change
+
+    let pp fmt { service; last_status; status_thread; on_change = _ } =
       let open Caml.Format in
       fprintf fmt "(%s %s -- thread: %s)"
         (Service.display_name service)
@@ -154,8 +167,15 @@ module Run = struct
         State.add_debug_message state (str "Running command: %s" s);
         protect (fun () -> command_succeeds s)
 
-  let start_service state service () = action state (Service.start service)
-  let stop_service state service () = action state (Service.stop service)
+  let start_service state srv () =
+    State.Service_data.signal_change srv `Starting;
+    let service = State.Service_data.service srv in
+    action state (Service.start service)
+
+  let stop_service state srv () =
+    State.Service_data.signal_change srv `Starting;
+    let service = State.Service_data.service srv in
+    action state (Service.stop service)
 
   let visit_service ~protect state service () =
     protect @@ fun () ->
@@ -206,18 +226,81 @@ let _not_implemented s () =
 
 let show_window state =
   let window =
-    GWindow.window ~title:"The Odd Service Tray" ~width:500 ~height:400 ()
+    GWindow.window ~title:"The Odd Service Tray" (* ~width:500 ~height:400 *) ()
       ~resizable:true ~icon:(App_icon.as_pixbuf ())
   in
   (* window#move ~x:20 ~y:20; *)
   (* let _ = window#connect#destroy ~callback:GMain.quit in *)
-  let hbox = GPack.hbox ~border_width:10 ~packing:window#add () in
-  let button =
-    GButton.button ~stock:`QUIT (*  ~label:"Click" *) ~packing:hbox#add ()
+  let main_vbox = GPack.vbox ~packing:window#add () in
+  let hbox =
+    GPack.button_box `HORIZONTAL ~layout:`START ~packing:main_vbox#add ()
   in
-  let menu = GButton.button ~label:"Other button" ~packing:hbox#add () in
+  let button = GButton.button ~stock:`QUIT ~packing:hbox#add () in
+  (* let menu = GButton.button ~label:"Other button" ~packing:hbox#add () in *)
   let _ = button#connect#clicked ~callback:GMain.quit in
-  let _ = menu#connect#clicked ~callback:(fun () -> dbgf "other button") in
+  let services = State.services_state state in
+  let services_table =
+    GPack.table
+    (* ~border_width:10 *)
+    (* ~columns:3 ~rows:(List.length services) *)
+      ~packing:main_vbox#add ()
+  in
+  services_table#set_halign `START;
+  List.iteri services
+    ~f:
+      begin
+        fun ith srv ->
+          let nth = ref 0 in
+          let packing w =
+            services_table#attach ~fill:`X ~left:!nth ~top:ith w;
+            Int.incr nth
+          in
+          (* GToolbox.build_menu *)
+          let label =
+            GMisc.label
+              ~justify:`LEFT
+                (* ~selectable:true *)
+                (* ~width:600 *)
+              ~markup:
+                (str "<b><u>Service:</u></b> <tt>%s</tt>"
+                   (State.Service_data.service srv |> Service.display_name))
+              ~packing ()
+          in
+          label#set_halign `START;
+          let status_label =
+            GMisc.label ~justify:`LEFT (* ~selectable:true *)
+              ~width:100 ~markup:"<b><u>???</u></b>" ~packing ()
+          in
+          let set_markup change =
+            status_label#set_label
+            @@ str "<tt>%s</tt>"
+                 (match change with
+                 | `Starting -> "<span foreground=\"orange\">Starting</span>"
+                 | `Stopping -> "<span foreground=\"orange\">Stopping</span>"
+                 | `Status (Ok ()) -> "<span foreground=\"green\">ON</span>"
+                 | `Status (Error _) -> "<span foreground=\"red\">OFF</span>")
+          in
+          set_markup (`Status (Error ""));
+          State.Service_data.add_on_change srv set_markup;
+          let start_button = GButton.button ~label:"Start" ~packing () in
+          let service = State.Service_data.service srv in
+          let (_ : GtkSignal.id) =
+            start_button#connect#clicked
+              ~callback:(Run.start_service ~protect:protect_exn state srv)
+          in
+          let stop_button = GButton.button ~label:"Stop" ~packing () in
+          let (_ : GtkSignal.id) =
+            stop_button#connect#clicked
+              ~callback:(Run.stop_service ~protect:protect_exn state srv)
+          in
+          let stop_button = GButton.button ~label:"Show UI" ~packing () in
+          let (_ : GtkSignal.id) =
+            stop_button#connect#clicked
+              ~callback:(Run.visit_service ~protect:protect_exn state service)
+          in
+          ()
+      end;
+  (* let _ = menu#connect#clicked ~callback:(fun () -> dbgf "other button") in *)
   window#show ();
   State.set_main_windows state (window :: State.main_windows state);
   ()
@@ -234,32 +317,28 @@ let start_application load_state =
   let menu ~button ~time =
     let entries =
       let services_section =
-        match State.configuration state with
-        | None -> `I ("No Configuration", Fn.ignore)
-        | Some conf -> begin
-            match Configuration.services conf with
-            | [] -> `I ("No services", Fn.ignore)
-            | more ->
-                `M
-                  ( "Services",
-                    List.map more ~f:(fun service ->
-                        `M
-                          ( Service.display_name service,
-                            [
-                              `I
-                                ( "Start",
-                                  Run.start_service ~protect:protect_exn state
-                                    service );
-                              `I
-                                ( "Stop",
-                                  Run.stop_service ~protect:protect_exn state
-                                    service );
-                              `I
-                                ( "Show UI",
-                                  Run.visit_service ~protect:protect_exn state
-                                    service );
-                            ] )) )
-          end
+        match State.services_state state with
+        | [] -> `I ("No services", Fn.ignore)
+        | more ->
+            `M
+              ( "Services",
+                List.map more ~f:(fun srv ->
+                    let service = State.Service_data.service srv in
+                    `M
+                      ( Service.display_name service,
+                        [
+                          `I
+                            ( "Start",
+                              Run.start_service ~protect:protect_exn state srv
+                            );
+                          `I
+                            ( "Stop",
+                              Run.stop_service ~protect:protect_exn state srv );
+                          `I
+                            ( "Show UI",
+                              Run.visit_service ~protect:protect_exn state
+                                service );
+                        ] )) )
       in
       [
         `I
@@ -293,6 +372,7 @@ let start_application load_state =
     (tray_icon#connect#popup_menu ~callback:(fun a b ->
          dbgf "popup: a: %d b: %d\n%!" a b;
          menu ~button:a ~time:(Int32.of_int_exn b)));
+  show_window state;
   GMain.main ()
 
 let () =
