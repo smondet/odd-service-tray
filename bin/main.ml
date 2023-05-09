@@ -41,6 +41,10 @@ module Service = struct
           (Action.command
              "docker exec  mldonkey-service sh -c 'ps aux | grep mldonkey | \
               grep -v grep'")
+
+    let failing_actions =
+      make "FailingActions" ~start:(Action.command "exit 3")
+        ~stop:(Action.command "exit 4") ~get_status:(Action.command "exit 5")
   end
 end
 
@@ -53,7 +57,7 @@ module Configuration = struct
   [@@deriving sexp, fields, equal, compare, make]
 
   module Example = struct
-    let e0 = make [ Service.Example.ml_donkey_docker ]
+    let e0 = make Service.Example.[ ml_donkey_docker; failing_actions ]
   end
 end
 
@@ -139,29 +143,13 @@ module State = struct
     | _ -> actual_default
 end
 
-let protect_exn f =
-  try f ()
-  with e ->
-    let msg = Caml.Format.(asprintf "@[Exception:@ %a@]\n%!" Exn.pp e) in
-    Caml.Printf.eprintf "%s\n%!" msg;
-    GToolbox.message_box ~title:"Error: unhandled exception" msg;
-    raise e
-
-let not_implemented s () =
-  let msg =
-    Caml.Format.(asprintf "@[Not implemented:@ %a@]\n%!" pp_print_text s)
-  in
-  Caml.Printf.eprintf "%s\n%!" msg;
-  GToolbox.message_box ~title:"Error: Not Implemented" msg;
-  ()
-
 module Run = struct
   let command_succeeds s =
     match Caml.Sys.command s with
     | 0 -> ()
     | other -> failwith (str "Command %S returned: %d" s other)
 
-  let action ?(protect = protect_exn) state = function
+  let action ~protect state = function
     | Action.Command s ->
         State.add_debug_message state (str "Running command: %s" s);
         protect (fun () -> command_succeeds s)
@@ -169,7 +157,8 @@ module Run = struct
   let start_service state service () = action state (Service.start service)
   let stop_service state service () = action state (Service.stop service)
 
-  let visit_service state service () =
+  let visit_service ~protect state service () =
+    protect @@ fun () ->
     match Service.ui service with
     | None ->
         failwith (str "Service %S has no UI" (Service.display_name service))
@@ -198,6 +187,22 @@ module Run = struct
     State.Service_data.set_status_thread service (Some thd);
     ()
 end
+
+let protect_exn f =
+  try f ()
+  with e ->
+    let msg = Caml.Format.(asprintf "@[Exception:@ %a@]\n%!" Exn.pp e) in
+    Caml.Printf.eprintf "%s\n%!" msg;
+    GToolbox.message_box ~title:"Error: unhandled exception" msg;
+    raise e
+
+let _not_implemented s () =
+  let msg =
+    Caml.Format.(asprintf "@[Not implemented:@ %a@]\n%!" pp_print_text s)
+  in
+  Caml.Printf.eprintf "%s\n%!" msg;
+  GToolbox.message_box ~title:"Error: Not Implemented" msg;
+  ()
 
 let show_window state =
   let window =
@@ -241,10 +246,18 @@ let start_application load_state =
                         `M
                           ( Service.display_name service,
                             [
-                              `I ("Start", Run.start_service state service);
-                              `I ("Get Status", not_implemented "status");
-                              `I ("Stop", Run.stop_service state service);
-                              `I ("Show UI", Run.visit_service state service);
+                              `I
+                                ( "Start",
+                                  Run.start_service ~protect:protect_exn state
+                                    service );
+                              `I
+                                ( "Stop",
+                                  Run.stop_service ~protect:protect_exn state
+                                    service );
+                              `I
+                                ( "Show UI",
+                                  Run.visit_service ~protect:protect_exn state
+                                    service );
                             ] )) )
           end
       in
