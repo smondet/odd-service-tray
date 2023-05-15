@@ -359,15 +359,8 @@ let start_application load_state =
   tray_icon#set_tooltip_text "tooletippe texte";
   ignore
     (tray_icon#connect#activate ~callback:(fun () ->
-         (*
-            (tray_icon#connct#popup_menu ~callback:(fun a b ->
-                 Fmt.epr "a: %d b: %d\n%!" a b;
-                 *)
          dbgf "activated %s\n%!" tray_icon#tooltip_text;
-         (* menu ~button:1 ~time:182639598l *)
-         (* popup () *)
-         show_window state
-         (* GToolbox.message_box ~title:"testgtk" "Tray icon activated!" *)));
+         show_window state));
   ignore
     (tray_icon#connect#popup_menu ~callback:(fun a b ->
          dbgf "popup: a: %d b: %d\n%!" a b;
