@@ -3,8 +3,71 @@ let str = Format.asprintf
 
 open! Base
 
+module Path = struct
+  open Caml.Filename
+
+  [@@@warning "-32"]
+
+  let quote = quote
+  let ( // ) = concat
+end
+
+module Component = struct
+  type t = Verbatim of string | Format of string
+  [@@deriving sexp, variants, equal, compare]
+
+  let t_of_sexp = function
+    | Sexp.Atom s -> Verbatim s
+    | other -> t_of_sexp other
+
+  let strings l = List.map l ~f:verbatim
+end
+
 module Action = struct
-  type t = Command of string [@@deriving sexp, variants, equal, compare]
+  type t = Exec of Component.t list
+  [@@deriving sexp, variants, equal, compare]
+
+  let command s =
+    exec
+      (Component.strings
+         (String.split ~on:' ' s |> List.filter ~f:String.(( <> ) "")))
+
+  module Docker = struct
+    let start_daemon ~name ?(options = []) ~image command =
+      exec
+        (Component.strings [ "docker"; "run"; "--rm"; "-d"; "--name"; name ]
+        @ options
+        @ Component.strings [ image ]
+        @ command)
+
+    let volume ?(access = ":rw") l d =
+      Component.[ verbatim "-v"; format (str "%s:%s%s" l d access) ]
+
+    let env k v = Component.[ verbatim "-e"; format (str "%s:%s" k v) ]
+
+    let port ?here v =
+      Component.
+        [ verbatim "-p"; format (str "%s:%s" (Option.value here ~default:v) v) ]
+
+    let udp_port ?here v =
+      Component.
+        [
+          verbatim "-p";
+          format (str "%s:%s/udp" (Option.value here ~default:v) v);
+        ]
+
+    let kill_daemon ~name = exec (Component.strings [ "docker"; "kill"; name ])
+
+    let get_status ~name =
+      exec
+        (Component.strings
+           [ "docker"; "inspect"; "--format"; "{{json .State.Running}}"; name ])
+  end
+end
+
+module Status = struct
+  type t = Succeeds of Action.t | And of t list
+  [@@deriving sexp, variants, equal, compare]
 end
 
 module UI = struct
@@ -24,23 +87,34 @@ module Service = struct
 
   module Example = struct
     let ml_donkey_docker =
+      let name = "ost-ml-donkey" in
       make "MLDonkey"
         ~ui:(UI.web_localhost ~port:4080)
         ~start:
-          (Action.command
-             "docker run --rm -d --name mldonkey-service -v \
-              $HOME/.local/mldonkey/config:/var/lib/mldonkey:rw -v \
-              $HOME/.local/mldonkey/tmp:/mnt/mldonkey_tmp:rw -e PUID=1000 -e \
-              PGID=1000 -v $HOME/Downloads/:/mnt/mldonkey_completed:rw -p \
-              4000:4000 -p 4001:4001 -p 4080:4080 -p 20562:20562 -p \
-              20566:20566/udp -p 16965:16965 -p 16965:16965/udp -p 6209:6209 \
-              -p 6209:6209/udp -p 6881:6881 -p 6882:6882 -p 3617:3617/udp -p \
-              4444:4444 -p 4444:4444/udp logicwar/mldonkey")
-        ~stop:(Action.command "docker kill mldonkey-service")
-        ~get_status:
-          (Action.command
-             "docker exec  mldonkey-service sh -c 'ps aux | grep mldonkey | \
-              grep -v grep'")
+          Action.Docker.(
+            start_daemon ~name ~image:"logicwar/mldonkey" []
+              ~options:
+                (volume "$(HOME)/.local/mldonkey/config" "/var/lib/mldonkey"
+                @ volume "$(HOME)/.local/mldonkey/tmp" "/mnt/mldonkey_tmp"
+                @ volume "$(HOME)/.local/mldonkey/downloads"
+                    "/mnt/mldonkey_completed"
+                @ env "PUID" "1000" @ env "PGID" "1000"
+                @ List.concat_map ~f:port
+                    [
+                      "4000";
+                      "4001";
+                      "4080";
+                      "20562";
+                      "16965";
+                      "6209";
+                      "6881";
+                      "6882";
+                      "4444";
+                    ]
+                @ List.concat_map ~f:udp_port
+                    [ "20566"; "16965"; "6209"; "3617"; "4444" ]))
+        ~stop:(Action.Docker.kill_daemon ~name)
+        ~get_status:(Action.Docker.get_status ~name)
 
     let failing_actions =
       make "FailingActions" ~start:(Action.command "exit 3")
@@ -163,7 +237,27 @@ module Run = struct
     | other -> failwith (str "Command %S returned: %d" s other)
 
   let action ~protect state = function
-    | Action.Command s ->
+    | Action.Exec comps ->
+        let s =
+          String.concat ~sep:" "
+            (List.map comps
+               ~f:
+                 Component.(
+                   function
+                   | Verbatim s -> Path.quote s
+                   | Format s ->
+                       let b = Buffer.create 42 in
+                       let subs = function
+                         | "HOME" ->
+                             Caml.Sys.getenv
+                               (if Caml.Sys.win32 then "HOMEPATH" else "HOME")
+                         | other ->
+                             failwith
+                               (str "Unknown variable expansion: %S" other)
+                       in
+                       Caml.Buffer.add_substitute b subs s;
+                       Path.quote (Buffer.contents b)))
+        in
         State.add_debug_message state (str "Running command: %s" s);
         protect (fun () -> command_succeeds s)
 
