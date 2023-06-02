@@ -173,7 +173,7 @@ module Run = struct
     action state (Service.start service)
 
   let stop_service state srv () =
-    State.Service_data.signal_change srv `Starting;
+    State.Service_data.signal_change srv `Stopping;
     let service = State.Service_data.service srv in
     action state (Service.stop service)
 
