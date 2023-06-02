@@ -118,7 +118,9 @@ module Service = struct
 
     let failing_actions =
       make "FailingActions" ~start:(Action.command "exit 3")
-        ~stop:(Action.command "exit 4") ~get_status:(Action.command "exit 5")
+        ~stop:
+          (Action.exec (Component.strings [ "sh"; "-c"; "sleep 4; exit 4" ]))
+        ~get_status:(Action.command "exit 5")
   end
 end
 
@@ -302,13 +304,18 @@ module Run = struct
     ()
 end
 
-let protect_exn f =
-  try f ()
-  with e ->
-    let msg = Caml.Format.(asprintf "@[Exception:@ %a@]\n%!" Exn.pp e) in
-    Caml.Printf.eprintf "%s\n%!" msg;
-    GToolbox.message_box ~title:"Error: unhandled exception" msg;
-    raise e
+let protect_exn ?(on_msg = Fn.ignore) f =
+  Thread.create
+    (fun () ->
+      try f ()
+      with e ->
+        let msg = Caml.Format.(asprintf "@[Exception:@ %a@]\n%!" Exn.pp e) in
+        Caml.Printf.eprintf "%s\n%!" msg;
+        on_msg msg;
+        (* GToolbox.message_box ~title:"Error: unhandled exception" msg; *)
+        raise e)
+    ()
+  |> Fn.ignore
 
 let _not_implemented s () =
   let msg =
@@ -332,7 +339,16 @@ let show_window state =
   let button = GButton.button ~stock:`QUIT ~packing:hbox#add () in
   (* let menu = GButton.button ~label:"Other button" ~packing:hbox#add () in *)
   let _ = button#connect#clicked ~callback:GMain.quit in
+  let _ = GMisc.separator `HORIZONTAL ~packing:main_vbox#add () in
   let services = State.services_state state in
+  let errors_label =
+    GMisc.label ~justify:`LEFT ~selectable:true (* ~width:600 *)
+      ~line_wrap:true
+      ~markup:(str "<b><u>No errors so far…</u></b>")
+      ~packing:main_vbox#add ()
+  in
+  let _ = GMisc.separator `HORIZONTAL ~packing:main_vbox#add () in
+  errors_label#set_halign `START;
   let services_table =
     GPack.table
     (* ~border_width:10 *)
@@ -356,7 +372,7 @@ let show_window state =
                 (* ~selectable:true *)
                 (* ~width:600 *)
               ~markup:
-                (str "<b><u>Service:</u></b> <tt>%s</tt>"
+                (str "<b><u>Service:</u></b>\n <tt>%s</tt>"
                    (State.Service_data.service srv |> Service.display_name))
               ~packing ()
           in
@@ -378,19 +394,29 @@ let show_window state =
           State.Service_data.add_on_change srv set_markup;
           let start_button = GButton.button ~label:"Start" ~packing () in
           let service = State.Service_data.service srv in
+          let exns = ref [] in
+          let protect =
+            protect_exn ~on_msg:(fun s ->
+                exns := s :: !exns;
+                errors_label#set_label
+                  (str "<b>Error%s</b>%s"
+                     (if List.length !exns = 1 then ":" else "s:\n")
+                     (String.concat ~sep:"\n"
+                        (List.map !exns ~f:(str "⚠ <tt>%s</tt>")))))
+          in
           let (_ : GtkSignal.id) =
             start_button#connect#clicked
-              ~callback:(Run.start_service ~protect:protect_exn state srv)
+              ~callback:(Run.start_service ~protect state srv)
           in
           let stop_button = GButton.button ~label:"Stop" ~packing () in
           let (_ : GtkSignal.id) =
             stop_button#connect#clicked
-              ~callback:(Run.stop_service ~protect:protect_exn state srv)
+              ~callback:(Run.stop_service ~protect state srv)
           in
           let stop_button = GButton.button ~label:"Show UI" ~packing () in
           let (_ : GtkSignal.id) =
             stop_button#connect#clicked
-              ~callback:(Run.visit_service ~protect:protect_exn state service)
+              ~callback:(Run.visit_service ~protect state service)
           in
           ()
       end;
@@ -463,7 +489,7 @@ let start_application load_state =
   GMain.main ()
 
 let () =
-  protect_exn @@ fun () ->
+  (* protect_exn @@ fun () -> *)
   match Array.to_list Caml.Sys.argv with
   | [ _; "start" ] ->
       start_application (fun state ->
