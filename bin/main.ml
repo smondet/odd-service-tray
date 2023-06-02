@@ -4,7 +4,7 @@ let str = Format.asprintf
 open! Base
 
 module Path = struct
-  open Caml.Filename
+  open Stdlib.Filename
 
   [@@@warning "-32"]
 
@@ -166,7 +166,7 @@ module State = struct
     let add_on_change self f = self.on_change <- f :: self.on_change
 
     let pp fmt { service; last_status; status_thread; on_change = _ } =
-      let open Caml.Format in
+      let open Stdlib.Format in
       fprintf fmt "(%s %s -- thread: %s)"
         (Service.display_name service)
         (match last_status with Ok () -> "OK" | Error s -> str "Dead: %s" s)
@@ -199,9 +199,9 @@ module State = struct
 
   let load_configuration_path state path =
     let b = Buffer.create 42 in
-    let i = Caml.open_in_bin path in
-    (try Caml.Buffer.add_channel b i Int.max_value with End_of_file -> ());
-    Caml.close_in i;
+    let i = Stdlib.open_in_bin path in
+    (try Stdlib.Buffer.add_channel b i Int.max_value with End_of_file -> ());
+    Stdlib.close_in i;
     let configuration =
       Sexplib.Sexp.of_string (Buffer.contents b) |> Configuration.t_of_sexp
     in
@@ -234,7 +234,7 @@ end
 
 module Run = struct
   let command_succeeds s =
-    match Caml.Sys.command s with
+    match Stdlib.Sys.command s with
     | 0 -> ()
     | other -> failwith (str "Command %S returned: %d" s other)
 
@@ -251,13 +251,13 @@ module Run = struct
                        let b = Buffer.create 42 in
                        let subs = function
                          | "HOME" ->
-                             Caml.Sys.getenv
-                               (if Caml.Sys.win32 then "HOMEPATH" else "HOME")
+                             Stdlib.Sys.getenv
+                               (if Stdlib.Sys.win32 then "HOMEPATH" else "HOME")
                          | other ->
                              failwith
                                (str "Unknown variable expansion: %S" other)
                        in
-                       Caml.Buffer.add_substitute b subs s;
+                       Stdlib.Buffer.add_substitute b subs s;
                        Path.quote (Buffer.contents b)))
         in
         State.add_debug_message state (str "Running command: %s" s);
@@ -309,8 +309,8 @@ let protect_exn ?(on_msg = Fn.ignore) f =
     (fun () ->
       try f ()
       with e ->
-        let msg = Caml.Format.(asprintf "@[Exception:@ %a@]\n%!" Exn.pp e) in
-        Caml.Printf.eprintf "%s\n%!" msg;
+        let msg = Stdlib.Format.(asprintf "@[Exception:@ %a@]\n%!" Exn.pp e) in
+        Stdlib.Printf.eprintf "%s\n%!" msg;
         on_msg msg;
         (* GToolbox.message_box ~title:"Error: unhandled exception" msg; *)
         raise e)
@@ -319,9 +319,9 @@ let protect_exn ?(on_msg = Fn.ignore) f =
 
 let _not_implemented s () =
   let msg =
-    Caml.Format.(asprintf "@[Not implemented:@ %a@]\n%!" pp_print_text s)
+    Stdlib.Format.(asprintf "@[Not implemented:@ %a@]\n%!" pp_print_text s)
   in
-  Caml.Printf.eprintf "%s\n%!" msg;
+  Stdlib.Printf.eprintf "%s\n%!" msg;
   GToolbox.message_box ~title:"Error: Not Implemented" msg;
   ()
 
@@ -490,7 +490,7 @@ let start_application load_state =
 
 let () =
   (* protect_exn @@ fun () -> *)
-  match Array.to_list Caml.Sys.argv with
+  match Array.to_list Stdlib.Sys.argv with
   | [ _; "start" ] ->
       start_application (fun state ->
           State.load_example state Configuration.Example.e0)
@@ -500,7 +500,7 @@ let () =
       dbgf "Example-config-0:@ %a" Sexp.pp_hum
         (Configuration.sexp_of_t Configuration.Example.e0)
   | other ->
-      Caml.Format.(
+      Stdlib.Format.(
         kasprintf failwith "Wrong command: %a"
           (pp_print_list pp_print_string)
           other)
